@@ -462,7 +462,7 @@ shard_count_view() ->
     Fold = fun view_cb/2,
     Args = [{group_level, exact}],
     {ok, Map} = couch_mrview:query_view(
-            Db, DDocId, <<"count_by_node">>, Fold, [], Args),
+            Db, DDocId, <<"count_by_node">>, Args, Fold, []),
     erlang:put(shard_count_by_node, {os:timestamp(), Map}),
     Map.
 
