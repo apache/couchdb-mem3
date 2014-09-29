@@ -61,7 +61,7 @@ for_docid(DbName, DocId) ->
     for_docid(DbName, DocId, []).
 
 for_docid(DbName, DocId, Options) ->
-    HashKey = mem3_util:hash(DocId),
+    HashKey = mem3_util:hash(DbName, DocId),
     ShardHead = #shard{
         name = '_',
         node = '_',
@@ -283,7 +283,7 @@ load_shards_from_db(#db{} = ShardDb, DbName) ->
 
 load_shards_from_disk(DbName, DocId)->
     Shards = load_shards_from_disk(DbName),
-    HashKey = mem3_util:hash(DocId),
+    HashKey = mem3_util:hash(DbName, DocId),
     [S || S <- Shards, in_range(S, HashKey)].
 
 in_range(Shard, HashKey) ->

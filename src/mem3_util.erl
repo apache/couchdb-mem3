@@ -12,7 +12,7 @@
 
 -module(mem3_util).
 
--export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
+-export([hash/2, name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
@@ -25,14 +25,38 @@
 -deprecated({name_shard, 1, eventually}).
 
 -define(RINGTOP, 2 bsl 31).  % CRC32 space
+-define(HASH_CACHE, hash_fun_lru).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-hash(Item) when is_binary(Item) ->
-    erlang:crc32(Item);
-hash(Item) ->
-    erlang:crc32(term_to_binary(Item)).
+-spec hash(binary(), term()) -> integer().
+hash(DbName, Item) when is_binary(Item) ->
+    MF = case ets_lru:lookup_d(?HASH_CACHE, DbName) of
+        {ok, MF0} ->
+            MF0;
+        _ ->
+            couch_stats:increment_counter([mem3, hash_fun_cache, hit]),
+            DbsDbName = ?l2b(config:get("mem3", "shard_db", "dbs")),
+            {ok, DbsDb} = mem3_util:ensure_exists(DbsDbName),
+            try
+                case couch_db:open_doc(DbsDb, DbName, [ejson_body]) of
+                    {ok, #doc{body = {Props}}} ->
+                        HashAlgo = couch_util:get_value(<<"hash_algorithm">>, Props, <<"crc32">>),
+                        {ok, HashAlgos} = application:get_env(mem3, hash_algorithms),
+                        MF0 = couch_util:get_value(binary_to_list(HashAlgo), HashAlgos),
+                        ets_lru:insert(?HASH_CACHE, DbName, MF0),
+                        MF0;
+                    {not_found, _} ->
+                        erlang:error(database_does_not_exist, ?b2l(DbName))
+                end
+            after
+                couch_db:close(DbsDb)
+            end
+    end,
+    erlang:apply(MF, [Item]);
+hash(DbName, Item) ->
+    hash(DbName, term_to_binary(Item)).
 
 name_shard(Shard) ->
     name_shard(Shard, "").
