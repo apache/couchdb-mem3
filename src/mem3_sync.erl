@@ -345,13 +345,13 @@ local_dbs() ->
     [nodes_db(), shards_db(), users_db()].
 
 nodes_db() ->
-    ?l2b(config:get("mem3", "nodes_db", "_nodes")).
+    ?l2b(mem3_dbs:name("nodes_db")).
 
 shards_db() ->
-    ?l2b(config:get("mem3", "shards_db", "_dbs")).
+    ?l2b(mem3_dbs:name("shards_db")).
 
 users_db() ->
-    ?l2b(config:get("couch_httpd_auth", "authentication_db", "_users")).
+    ?l2b(couch_dbs:name("authentication_db")).
 
 maybe_redirect(Node) ->
     case config:get("mem3.redirects", atom_to_list(Node)) of
