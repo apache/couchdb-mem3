@@ -300,7 +300,7 @@ changes_callback({change, {Change}, _}, _) ->
             {Doc} ->
                 Shards = mem3_util:build_ordered_shards(DbName, Doc),
                 gen_server:cast(?MODULE, {cache_insert, DbName, Shards}),
-                [create_if_missing(mem3:name(S)) || S
+                [create_if_missing(mem3:name(S), mem3:engine(S)) || S
                     <- Shards, mem3:node(S) =:= node()]
             end
         end
@@ -337,20 +337,18 @@ in_range(Shard, HashKey) ->
     [B, E] = mem3:range(Shard),
     B =< HashKey andalso HashKey =< E.
 
-create_if_missing(Name) ->
-    DbDir = config:get("couchdb", "database_dir"),
-    Filename = filename:join(DbDir, ?b2l(Name) ++ ".couch"),
-    case filelib:is_regular(Filename) of
-    true ->
-        ok;
-    false ->
-        case couch_server:create(Name, [?ADMIN_CTX]) of
-        {ok, Db} ->
-            couch_db:close(Db);
-        Error ->
-            couch_log:error("~p tried to create ~s, got ~p",
-                [?MODULE, Name, Error])
-        end
+create_if_missing(Name, Options) ->
+    case couch_server:exists(Name) of
+        true ->
+            ok;
+        false ->
+            case couch_server:create(Name, [?ADMIN_CTX] ++ Options) of
+            {ok, Db} ->
+                couch_db:close(Db);
+            Error ->
+                couch_log:error("~p tried to create ~s, got ~p",
+                    [?MODULE, Name, Error])
+            end
     end.
 
 cache_insert(#st{cur_size=Cur}=St, DbName, Shards) ->
