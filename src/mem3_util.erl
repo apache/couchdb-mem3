@@ -200,7 +200,8 @@ n_val(undefined, NodeCount) ->
 n_val(N, NodeCount) when is_list(N) ->
     n_val(list_to_integer(N), NodeCount);
 n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->
-    couch_log:error("Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
+    couch_log:warning("Request to create N=~p DB but only ~p node(s)", [N, NodeCount]),
+    couch_log:warning("If you are running a single-node installation, you can ignore the previous warning", []),
     NodeCount;
 n_val(N, _) when N < 1 ->
     1;
