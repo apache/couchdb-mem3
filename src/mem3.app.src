@@ -49,5 +49,10 @@
         couch_log,
         couch_event,
         couch_stats
+    ]},
+    {env, [
+        {hash_algorithms, [
+            {"crc32", {erlang, crc32}}
+        ]}
     ]}
 ]}.
