@@ -170,11 +170,11 @@ find_source_seq_int(#doc{body={Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
     end.
 
 
-repl(#db{name=DbName, seq_tree=Bt}=Db, Acc0) ->
-    erlang:put(io_priority, {internal_repl, DbName}),
+repl(Db, Acc0) ->
+    erlang:put(io_priority, {internal_repl, couch_db:name(Db)}),
     #acc{seq=Seq} = Acc1 = calculate_start_seq(Acc0#acc{source = Db}),
     Fun = fun ?MODULE:changes_enumerator/3,
-    {ok, _, Acc2} = couch_btree:fold(Bt, Fun, Acc1, [{start_key, Seq + 1}]),
+    {ok, _, Acc2} = couch_db:enum_docs_since(Db, Seq, Fun, Acc1, []),
     {ok, #acc{seq = LastSeq}} = replicate_batch(Acc2),
     {ok, couch_db:count_changes_since(Db, LastSeq)}.
 
@@ -354,10 +354,10 @@ find_repl_doc(SrcDb, TgtUUIDPrefix) ->
         end
     end,
     Options = [{start_key, DocIdPrefix}],
-    case couch_btree:fold(SrcDb#db.local_tree, FoldFun, not_found, Options) of
-        {ok, _, {TgtUUID, Doc}} ->
+    case couch_db:fold_local_docs(SrcDb, FoldFun, not_found, Options) of
+        {ok, {TgtUUID, Doc}} ->
             {ok, TgtUUID, Doc};
-        {ok, _, not_found} ->
+        {ok, not_found} ->
             {not_found, missing};
         Else ->
             couch_log:error("Error finding replication doc: ~w", [Else]),

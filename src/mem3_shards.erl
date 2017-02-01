@@ -267,7 +267,7 @@ get_update_seq() ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     couch_db:close(Db),
-    Db#db.update_seq.
+    couch_db:get_update_seq(Db).
 
 listen_for_changes(Since) ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
@@ -317,7 +317,7 @@ load_shards_from_disk(DbName) when is_binary(DbName) ->
         couch_db:close(Db)
     end.
 
-load_shards_from_db(#db{} = ShardDb, DbName) ->
+load_shards_from_db(ShardDb, DbName) ->
     case couch_db:open_doc(ShardDb, DbName, [ejson_body]) of
     {ok, #doc{body = {Props}}} ->
         Shards = mem3_util:build_ordered_shards(DbName, Props),
