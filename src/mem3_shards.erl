@@ -344,7 +344,12 @@ load_shards_from_db(ShardDb, DbName) ->
     {ok, #doc{body = {Props}}} ->
         Seq = couch_db:get_update_seq(ShardDb),
         Shards = mem3_util:build_ordered_shards(DbName, Props),
-        gen_server:cast(?MODULE, {cache_insert, DbName, Shards, Seq}),
+        case erlang:process_info(whereis(?MODULE), message_queue_len) of
+            {_, N} when is_integer(N), N < 5000 ->
+                gen_server:cast(?MODULE, {cache_insert, DbName, Shards, Seq});
+            _ ->
+                ok
+        end,
         Shards;
     {not_found, _} ->
         erlang:error(database_does_not_exist, ?b2l(DbName))
