@@ -203,6 +203,7 @@ handle_cast({cache_hit, DbName}, St) ->
     cache_hit(DbName),
     {noreply, St};
 handle_cast({cache_insert, DbName, Shards, UpdateSeq}, St) ->
+    couch_log:notice("~p maybe adding ~s ~p ~p", [?MODULE, DbName, St#st.update_seq, UpdateSeq]),
     couch_stats:increment_counter([mem3, shard_cache, miss]),
     NewSt = case UpdateSeq < St#st.update_seq of
         true -> St;
@@ -211,6 +212,7 @@ handle_cast({cache_insert, DbName, Shards, UpdateSeq}, St) ->
     {noreply, NewSt};
 handle_cast({cache_remove, DbName}, St) ->
     couch_stats:increment_counter([mem3, shard_cache, eviction]),
+    couch_log:notice("~p removing ~s ~p", [?MODULE, DbName, St#st.update_seq]),
     {noreply, cache_remove(St, DbName)};
 handle_cast({cache_insert_change, DbName, Shards, UpdateSeq}, St) ->
     Msg = {cache_insert, DbName, Shards, UpdateSeq},
@@ -225,6 +227,7 @@ handle_cast(_Msg, St) ->
 handle_info({'DOWN', _, _, Pid, Reason}, #st{changes_pid=Pid}=St) ->
     {NewSt, Seq} = case Reason of
         {seq, EndSeq} ->
+            couch_log:notice("~p changes listener ended ~p", [?MODULE, EndSeq]),
             {St, EndSeq};
         shard_db_changed ->
             {cache_clear(St), get_update_seq()};
@@ -264,6 +267,7 @@ start_changes_listener(SinceSeq) ->
             end,
             exit(shutdown)
         end),
+        couch_log:notice("~p changes listener starting ~p", [?MODULE, SinceSeq]),
         listen_for_changes(SinceSeq)
     end),
     Pid.
@@ -417,6 +421,7 @@ cache_hit(DbName) ->
     end.
 
 cache_free(#st{max_size=Max, cur_size=Cur}=St) when Max =< Cur ->
+    couch_stats:increment_counter([mem3, shard_cache, eviction]),
     ATime = ets:first(?ATIMES),
     [{ATime, DbName}] = ets:lookup(?ATIMES, ATime),
     true = ets:delete(?ATIMES, ATime),
